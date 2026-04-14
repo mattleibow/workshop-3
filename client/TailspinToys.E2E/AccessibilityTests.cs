@@ -97,17 +97,20 @@ public class AccessibilityTests : PlaywrightTestBase
         await Page.GotoAsync("/");
         await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 10000 });
 
-        // Tab through header elements to get to game cards
+        // Tab through all interactive elements (header, filter checkboxes, game cards).
+        // The tab limit is intentionally large to accommodate the filter panel checkboxes
+        // that were added for category and publisher filtering.
         var tabCount = 0;
         var gameCardFocused = false;
 
-        while (tabCount < 20 && !gameCardFocused)
+        while (tabCount < 60 && !gameCardFocused)
         {
             await Page.Keyboard.PressAsync("Tab");
             tabCount++;
 
             var focusedElement = Page.Locator(":focus");
-            var testId = await focusedElement.GetAttributeAsync("data-testid");
+            var testId = await focusedElement.GetAttributeAsync("data-testid",
+                new() { Timeout = 1000 });
 
             if (testId == "game-card")
             {
