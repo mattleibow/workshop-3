@@ -232,6 +232,98 @@ public class TestGamesRoutes : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task GetGames_FilterByCategoryId_ReturnsMatchingGames()
+    {
+        // Get category IDs from the seeded data
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TailspinToysContext>();
+        var strategyCategory = db.Categories.First(c => c.Name == "Strategy");
+
+        // Act
+        var response = await _client.GetAsync($"{GamesApiPath}?categoryIds={strategyCategory.Id}");
+        var data = await response.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(data);
+        Assert.Single(data);
+        Assert.Equal("Pipeline Panic", data[0]["title"]?.ToString());
+    }
+
+    [Fact]
+    public async Task GetGames_FilterByPublisherId_ReturnsMatchingGames()
+    {
+        // Get publisher ID from seeded data
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TailspinToysContext>();
+        var publisher = db.Publishers.First(p => p.Name == "Scrum Masters");
+
+        // Act
+        var response = await _client.GetAsync($"{GamesApiPath}?publisherIds={publisher.Id}");
+        var data = await response.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(data);
+        Assert.Single(data);
+        Assert.Equal("Agile Adventures", data[0]["title"]?.ToString());
+    }
+
+    [Fact]
+    public async Task GetGames_FilterByCategoryAndPublisher_ReturnsCombinedResults()
+    {
+        // Get both category and publisher IDs
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TailspinToysContext>();
+        var strategyCategory = db.Categories.First(c => c.Name == "Strategy");
+        var publisher = db.Publishers.First(p => p.Name == "DevGames Inc");
+
+        // Act — category Strategy AND publisher DevGames Inc should return Pipeline Panic
+        var response = await _client.GetAsync(
+            $"{GamesApiPath}?categoryIds={strategyCategory.Id}&publisherIds={publisher.Id}");
+        var data = await response.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(data);
+        Assert.Single(data);
+        Assert.Equal("Pipeline Panic", data[0]["title"]?.ToString());
+    }
+
+    [Fact]
+    public async Task GetGames_FilterByMultipleCategoryIds_ReturnsAllMatching()
+    {
+        // Get both category IDs
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TailspinToysContext>();
+        var strategyCategory = db.Categories.First(c => c.Name == "Strategy");
+        var cardGameCategory = db.Categories.First(c => c.Name == "Card Game");
+
+        // Act — both categories should return all games
+        var response = await _client.GetAsync(
+            $"{GamesApiPath}?categoryIds={strategyCategory.Id}&categoryIds={cardGameCategory.Id}");
+        var data = await response.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(data);
+        Assert.Equal(TestGames.Length, data.Count);
+    }
+
+    [Fact]
+    public async Task GetGames_FilterByNonExistentId_ReturnsEmptyList()
+    {
+        // Act — ID 9999 does not exist
+        var response = await _client.GetAsync($"{GamesApiPath}?categoryIds=9999");
+        var data = await response.Content.ReadFromJsonAsync<List<object>>();
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(data);
+        Assert.Empty(data);
+    }
+
     public void Dispose()
     {
         _client.Dispose();

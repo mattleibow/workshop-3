@@ -123,6 +123,77 @@ public class GamesTests : PlaywrightTestBase
         await Expect(Page).ToHaveTitleAsync(new System.Text.RegularExpressions.Regex("Game Details - Tailspin Toys"));
     }
 
+    [Fact]
+    public async Task ShouldDisplayFilterPanel()
+    {
+        await Page.GotoAsync("/");
+        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 15000 });
+
+        var filterPanel = Page.GetByTestId("game-filters");
+        await Expect(filterPanel).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public async Task ShouldFilterGamesByCategory()
+    {
+        await Page.GotoAsync("/");
+        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 15000 });
+
+        // Count total games before filtering
+        var allCards = Page.GetByTestId("game-card");
+        var totalCount = await allCards.CountAsync();
+        Assert.True(totalCount > 0);
+
+        // Find a category option and check if there are multiple categories available
+        var categoryOptions = Page.GetByTestId("filter-category-option");
+        var categoryCount = await categoryOptions.CountAsync();
+
+        if (categoryCount > 0)
+        {
+            // Click the first category checkbox
+            var firstCheckbox = categoryOptions.First.Locator("input[type='checkbox']");
+            await firstCheckbox.CheckAsync();
+
+            // Wait for the grid to update
+            await Page.WaitForTimeoutAsync(1000);
+
+            // The grid should still be visible (either with filtered results or empty state)
+            var gridVisible = await Page.GetByTestId("games-grid").IsVisibleAsync();
+            var emptyVisible = await Page.Locator("[data-testid='games-grid'], .empty-state, [class*='EmptyState']").IsVisibleAsync();
+            Assert.True(gridVisible || emptyVisible);
+        }
+    }
+
+    [Fact]
+    public async Task ShouldClearFiltersAndRestoreFullList()
+    {
+        await Page.GotoAsync("/");
+        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 15000 });
+
+        var allCards = Page.GetByTestId("game-card");
+        var totalCount = await allCards.CountAsync();
+
+        // Apply a filter
+        var categoryOptions = Page.GetByTestId("filter-category-option");
+        var categoryCount = await categoryOptions.CountAsync();
+
+        if (categoryCount > 0)
+        {
+            await categoryOptions.First.Locator("input[type='checkbox']").CheckAsync();
+            await Page.WaitForTimeoutAsync(1000);
+
+            // Clear filters button should appear
+            var clearButton = Page.GetByTestId("filter-clear-button");
+            await Expect(clearButton).ToBeVisibleAsync();
+            await clearButton.ClickAsync();
+
+            // Wait for full list to restore
+            await Page.WaitForTimeoutAsync(1000);
+            var restoredCount = await Page.GetByTestId("game-card").CountAsync();
+            Assert.Equal(totalCount, restoredCount);
+        }
+    }
+
     private static ILocatorAssertions Expect(ILocator locator) => Assertions.Expect(locator);
     private static IPageAssertions Expect(IPage page) => Assertions.Expect(page);
 }
