@@ -1,0 +1,120 @@
+@* GameFilter.razor - Renders category and publisher filter badge pills.
+   Emits FilterChanged when the user toggles a filter or clears all filters.
+   Note: no @rendermode directive here — this component is always rendered as a
+   child of the already-interactive GameList component. *@
+@using TailspinToys.Web.Models
+@inject IHttpClientFactory HttpClientFactory
+
+@if (categories.Length > 0 || publishers.Length > 0)
+{
+    <div data-testid="game-filter" class="mb-8 p-5 bg-slate-800/60 backdrop-blur-sm rounded-xl border border-slate-700/50">
+        @if (categories.Length > 0)
+        {
+            <div class="mb-4">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Category</h3>
+                <div class="flex flex-wrap gap-2">
+                    @foreach (var cat in categories)
+                    {
+                        var isActive = filterState.CategoryId == cat.Id;
+                        <button data-testid="filter-category-@cat.Id"
+                                aria-pressed="@isActive.ToString().ToLower()"
+                                aria-label="Filter by category @cat.Name"
+                                class="@CategoryBadgeClass(isActive) transition-all duration-200"
+                                @onclick="() => ToggleCategory(cat.Id)">
+                            @cat.Name
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (publishers.Length > 0)
+        {
+            <div class="mb-4">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Publisher</h3>
+                <div class="flex flex-wrap gap-2">
+                    @foreach (var pub in publishers)
+                    {
+                        var isActive = filterState.PublisherId == pub.Id;
+                        <button data-testid="filter-publisher-@pub.Id"
+                                aria-pressed="@isActive.ToString().ToLower()"
+                                aria-label="Filter by publisher @pub.Name"
+                                class="@PublisherBadgeClass(isActive) transition-all duration-200"
+                                @onclick="() => TogglePublisher(pub.Id)">
+                            @pub.Name
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (filterState.HasActiveFilters)
+        {
+            <div class="border-t border-slate-700/50 pt-3 mt-1">
+                <button data-testid="filter-clear"
+                        aria-label="Clear all filters"
+                        class="text-sm text-slate-400 hover:text-slate-100 transition-colors duration-200 flex items-center gap-1"
+                        @onclick="ClearFilters">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                    Clear filters
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public EventCallback<GameFilterState> FilterChanged { get; set; }
+
+    private FilterOption[] categories = [];
+    private FilterOption[] publishers = [];
+    private GameFilterState filterState = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var client = HttpClientFactory.CreateClient("API");
+
+        try
+        {
+            var cats  = await client.GetFromJsonAsync<FilterOption[]>("api/categories");
+            var pubs  = await client.GetFromJsonAsync<FilterOption[]>("api/publishers");
+            categories = cats ?? [];
+            publishers = pubs ?? [];
+        }
+        catch
+        {
+            // If the fetch fails, the filter simply renders nothing
+        }
+    }
+
+    private async Task ToggleCategory(int id)
+    {
+        filterState.CategoryId = filterState.CategoryId == id ? null : id;
+        await FilterChanged.InvokeAsync(filterState);
+    }
+
+    private async Task TogglePublisher(int id)
+    {
+        filterState.PublisherId = filterState.PublisherId == id ? null : id;
+        await FilterChanged.InvokeAsync(filterState);
+    }
+
+    private async Task ClearFilters()
+    {
+        filterState = new GameFilterState();
+        await FilterChanged.InvokeAsync(filterState);
+    }
+
+    private static string CategoryBadgeClass(bool active) => active
+        ? "text-xs font-semibold px-3 py-1 rounded-full bg-blue-600 text-white border border-blue-500 cursor-pointer"
+        : "text-xs font-semibold px-3 py-1 rounded-full bg-blue-900/40 text-blue-300 border border-blue-800/50 hover:bg-blue-900/70 cursor-pointer";
+
+    private static string PublisherBadgeClass(bool active) => active
+        ? "text-xs font-semibold px-3 py-1 rounded-full bg-purple-600 text-white border border-purple-500 cursor-pointer"
+        : "text-xs font-semibold px-3 py-1 rounded-full bg-purple-900/40 text-purple-300 border border-purple-800/50 hover:bg-purple-900/70 cursor-pointer";
+
+    private record FilterOption(int Id, string Name);
+}
