@@ -10,13 +10,23 @@ public static class GamesRoutes
     {
         var group = app.MapGroup("/api/games");
 
-        group.MapGet("/", async (TailspinToysContext db) =>
+        group.MapGet("/", async (
+            [Microsoft.AspNetCore.Mvc.FromQuery] int[]? categoryIds,
+            [Microsoft.AspNetCore.Mvc.FromQuery] int[]? publisherIds,
+            TailspinToysContext db) =>
         {
-            var games = await db.Games
+            var query = db.Games
                 .Include(g => g.Publisher)
                 .Include(g => g.Category)
-                .OrderBy(g => g.Id)
-                .ToListAsync();
+                .AsQueryable();
+
+            if (categoryIds is { Length: > 0 })
+                query = query.Where(g => categoryIds.Contains(g.CategoryId));
+
+            if (publisherIds is { Length: > 0 })
+                query = query.Where(g => publisherIds.Contains(g.PublisherId));
+
+            var games = await query.OrderBy(g => g.Id).ToListAsync();
 
             return Results.Ok(games.Select(g => g.ToDict()));
         });

@@ -35,6 +35,8 @@ This is a crowdfunding platform for games with a developer theme. The applicatio
 - When writing C#, you must use type annotations for return values and method parameters.
 - Use nullable reference types when appropriate so generated code clearly communicates nullability expectations.
 - Follow C# naming conventions (PascalCase for public members, camelCase for locals)
+- Every public method should have XML doc comments or the language equivalent.
+- Before the namespace declaration or any code, add a comment block to the file that explains its purpose.
 
 ### C# and ASP.NET Core Patterns
 
