@@ -2,7 +2,7 @@
 @using TailspinToys.Web.Models
 @inject IHttpClientFactory HttpClientFactory
 
-<div>
+<div data-blazor-connected="@(_blazorConnected ? "true" : "false")">
     <h2 class="text-2xl font-medium mb-6 text-slate-100">Featured Games</h2>
 
     <GameFilter FilterChanged="OnFilterChanged" />
@@ -35,10 +35,24 @@
     private bool isLoading = true;
     private string? errorMessage;
     private GameFilterState currentFilter = new();
+    // Set to true only after the interactive Blazor circuit fires OnAfterRenderAsync.
+    // Pre-rendered HTML always has data-blazor-connected="false"; tests wait for "true"
+    // to ensure clicks are processed by the live circuit, not the static SSR snapshot.
+    private bool _blazorConnected = false;
 
     protected override async Task OnInitializedAsync()
     {
         await FetchGames();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_blazorConnected)
+        {
+            _blazorConnected = true;
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
     }
 
     private async Task OnFilterChanged(GameFilterState filter)

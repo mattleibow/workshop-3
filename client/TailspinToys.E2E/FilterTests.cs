@@ -9,13 +9,24 @@ namespace TailspinToys.E2E;
 public class FilterTests : PlaywrightTestBase
 {
     /// <summary>
+    /// Waits for the Blazor interactive circuit to be established on the home page.
+    /// OnAfterRenderAsync sets data-blazor-connected="true" only in the interactive render,
+    /// never in the SSR pre-render, so this reliably guards against clicking before the
+    /// circuit is ready.
+    /// </summary>
+    private async Task WaitForInteractiveAsync()
+    {
+        await Page.GotoAsync("/");
+        await Page.WaitForSelectorAsync("[data-blazor-connected='true']", new() { Timeout = 15000 });
+    }
+
+    /// <summary>
     /// The filter panel should be visible on the home page.
     /// </summary>
     [Fact]
     public async Task ShouldDisplayFilterPanel()
     {
-        await Page.GotoAsync("/");
-        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 15000 });
+        await WaitForInteractiveAsync();
 
         await Expect(Page.GetByTestId("game-filter")).ToBeVisibleAsync();
     }
@@ -27,8 +38,7 @@ public class FilterTests : PlaywrightTestBase
     [Fact]
     public async Task ShouldFilterGamesByCategoryBadge()
     {
-        await Page.GotoAsync("/");
-        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 15000 });
+        await WaitForInteractiveAsync();
 
         var initialCount = await Page.GetByTestId("game-card").CountAsync();
 
@@ -60,8 +70,7 @@ public class FilterTests : PlaywrightTestBase
     [Fact]
     public async Task ShouldFilterGamesByPublisherBadge()
     {
-        await Page.GotoAsync("/");
-        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 15000 });
+        await WaitForInteractiveAsync();
 
         // Click the first publisher badge
         var firstPublisherBadge = Page.Locator("[data-testid^='filter-publisher-']").First;
@@ -89,8 +98,7 @@ public class FilterTests : PlaywrightTestBase
     [Fact]
     public async Task ShouldCombineCategoryAndPublisherFilters()
     {
-        await Page.GotoAsync("/");
-        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 15000 });
+        await WaitForInteractiveAsync();
 
         var unfilteredCount = await Page.GetByTestId("game-card").CountAsync();
 
@@ -123,8 +131,7 @@ public class FilterTests : PlaywrightTestBase
     [Fact]
     public async Task ShouldClearFiltersAndRestoreFullList()
     {
-        await Page.GotoAsync("/");
-        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 15000 });
+        await WaitForInteractiveAsync();
 
         var unfilteredCount = await Page.GetByTestId("game-card").CountAsync();
 
@@ -156,8 +163,7 @@ public class FilterTests : PlaywrightTestBase
     [Fact]
     public async Task ShouldDeselectFilterBadgeOnSecondClick()
     {
-        await Page.GotoAsync("/");
-        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 15000 });
+        await WaitForInteractiveAsync();
 
         var unfilteredCount = await Page.GetByTestId("game-card").CountAsync();
 
