@@ -240,6 +240,109 @@ public class AccessibilityTests : PlaywrightTestBase
         }
     }
 
+    // ── Heading hierarchy ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Verifies the home page has exactly one h1 with the correct text.
+    /// </summary>
+    [Fact]
+    public async Task HeadingHierarchyShouldHaveExactlyOneH1OnHomePage()
+    {
+        await Page.GotoAsync("/");
+        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 10000 });
+
+        var h1s = Page.GetByRole(AriaRole.Heading, new() { Level = 1 });
+        Assert.Equal(1, await h1s.CountAsync());
+        await Expect(h1s.First).ToHaveTextAsync("Welcome to Tailspin Toys");
+    }
+
+    /// <summary>
+    /// Verifies the about page has exactly one h1 with the correct text.
+    /// </summary>
+    [Fact]
+    public async Task HeadingHierarchyShouldHaveExactlyOneH1OnAboutPage()
+    {
+        await Page.GotoAsync("/about");
+        await Page.WaitForSelectorAsync("[data-testid='about-section']", new() { Timeout = 10000 });
+
+        var h1s = Page.GetByRole(AriaRole.Heading, new() { Level = 1 });
+        Assert.Equal(1, await h1s.CountAsync());
+        await Expect(h1s.First).ToHaveTextAsync("About Tailspin Toys");
+    }
+
+    /// <summary>
+    /// Verifies the game details page has exactly one h1 (the game title).
+    /// </summary>
+    [Fact]
+    public async Task HeadingHierarchyShouldHaveExactlyOneH1OnGameDetailsPage()
+    {
+        await Page.GotoAsync("/game/1");
+        await Page.WaitForSelectorAsync("[data-testid='game-details']", new() { Timeout = 10000 });
+
+        var h1s = Page.GetByRole(AriaRole.Heading, new() { Level = 1 });
+        Assert.Equal(1, await h1s.CountAsync());
+        await Expect(h1s.First).Not.ToBeEmptyAsync();
+    }
+
+    /// <summary>
+    /// Verifies that heading levels do not skip on the home page
+    /// (e.g. no h3 without a preceding h2, no h2 without a preceding h1).
+    /// </summary>
+    [Fact]
+    public async Task HeadingsShouldNotSkipLevelsOnHomePage()
+    {
+        await Page.GotoAsync("/");
+        await Page.WaitForSelectorAsync("[data-testid='games-grid']", new() { Timeout = 10000 });
+
+        await AssertHeadingHierarchyAsync(Page);
+    }
+
+    /// <summary>
+    /// Verifies that heading levels do not skip on the about page.
+    /// </summary>
+    [Fact]
+    public async Task HeadingsShouldNotSkipLevelsOnAboutPage()
+    {
+        await Page.GotoAsync("/about");
+        await Page.WaitForSelectorAsync("[data-testid='about-section']", new() { Timeout = 10000 });
+
+        await AssertHeadingHierarchyAsync(Page);
+    }
+
+    /// <summary>
+    /// Verifies that heading levels do not skip on the game details page.
+    /// </summary>
+    [Fact]
+    public async Task HeadingsShouldNotSkipLevelsOnGameDetailsPage()
+    {
+        await Page.GotoAsync("/game/1");
+        await Page.WaitForSelectorAsync("[data-testid='game-details']", new() { Timeout = 10000 });
+
+        await AssertHeadingHierarchyAsync(Page);
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Asserts that headings on the current page start at h1 and never skip a level.
+    /// </summary>
+    private static async Task AssertHeadingHierarchyAsync(IPage page)
+    {
+        var levels = await page.EvaluateAsync<int[]>(@"() =>
+            Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6'))
+                 .map(h => parseInt(h.tagName[1]))");
+
+        Assert.NotEmpty(levels);
+        Assert.Equal(1, levels[0]);
+
+        for (var i = 1; i < levels.Length; i++)
+        {
+            var jump = levels[i] - levels[i - 1];
+            Assert.True(jump <= 1,
+                $"Heading skips from h{levels[i - 1]} to h{levels[i]} at position {i} — no heading levels should be skipped.");
+        }
+    }
+
     private static ILocatorAssertions Expect(ILocator locator) => Assertions.Expect(locator);
     private static IPageAssertions Expect(IPage page) => Assertions.Expect(page);
 }
