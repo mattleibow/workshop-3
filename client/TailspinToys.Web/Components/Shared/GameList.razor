@@ -4,6 +4,8 @@
 <div>
     <h2 class="text-2xl font-medium mb-6 text-slate-100">Featured Games</h2>
 
+    <GameFilters OnFiltersChanged="OnFiltersChanged" />
+
     @if (isLoading)
     {
         <LoadingSkeleton />
@@ -31,13 +33,32 @@
     private Game[]? games;
     private bool isLoading = true;
     private string? errorMessage;
+    private int[] activeCategoryIds = [];
+    private int[] activePublisherIds = [];
 
     protected override async Task OnInitializedAsync()
     {
+        await FetchGames();
+    }
+
+    private async Task OnFiltersChanged((int[] CategoryIds, int[] PublisherIds) filters)
+    {
+        activeCategoryIds = filters.CategoryIds;
+        activePublisherIds = filters.PublisherIds;
+        await FetchGames();
+    }
+
+    private async Task FetchGames()
+    {
+        isLoading = true;
+        errorMessage = null;
+
         try
         {
             var client = HttpClientFactory.CreateClient("API");
-            var response = await client.GetAsync("api/games");
+
+            var query = BuildQueryString();
+            var response = await client.GetAsync($"api/games{query}");
 
             if (response.IsSuccessStatusCode)
             {
@@ -56,5 +77,15 @@
         {
             isLoading = false;
         }
+    }
+
+    private string BuildQueryString()
+    {
+        var parts = new List<string>();
+        foreach (var id in activeCategoryIds)
+            parts.Add($"categoryIds={id}");
+        foreach (var id in activePublisherIds)
+            parts.Add($"publisherIds={id}");
+        return parts.Count > 0 ? "?" + string.Join("&", parts) : "";
     }
 }

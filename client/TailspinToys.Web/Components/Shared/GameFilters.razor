@@ -1,0 +1,126 @@
+@rendermode InteractiveServer
+@using TailspinToys.Web.Models
+@inject IHttpClientFactory HttpClientFactory
+
+<div data-testid="game-filters" class="mb-6 bg-slate-800/60 backdrop-blur-sm rounded-xl border border-slate-700/50 p-5">
+    <h3 class="text-slate-100 font-semibold text-lg mb-4">Filter Games</h3>
+
+    @if (isLoading)
+    {
+        <p class="text-slate-400 text-sm">Loading filters…</p>
+    }
+    else
+    {
+        <div class="flex flex-col sm:flex-row gap-6">
+
+            @if (categories.Count > 0)
+            {
+                <fieldset class="flex-1" data-testid="filter-categories">
+                    <legend class="text-slate-300 text-sm font-medium mb-2">Category</legend>
+                    <div class="flex flex-col gap-1.5">
+                        @foreach (var category in categories)
+                        {
+                            <label class="flex items-center gap-2 cursor-pointer group"
+                                   data-testid="filter-category-option">
+                                <input type="checkbox"
+                                       checked="@selectedCategoryIds.Contains(category.Id)"
+                                       @onchange="e => ToggleCategory(category.Id, (bool)(e.Value ?? false))"
+                                       class="accent-blue-500 w-4 h-4"
+                                       aria-label="@category.Name" />
+                                <span class="text-slate-300 text-sm group-hover:text-slate-100 transition-colors">
+                                    @category.Name
+                                </span>
+                            </label>
+                        }
+                    </div>
+                </fieldset>
+            }
+
+            @if (publishers.Count > 0)
+            {
+                <fieldset class="flex-1" data-testid="filter-publishers">
+                    <legend class="text-slate-300 text-sm font-medium mb-2">Publisher</legend>
+                    <div class="flex flex-col gap-1.5">
+                        @foreach (var publisher in publishers)
+                        {
+                            <label class="flex items-center gap-2 cursor-pointer group"
+                                   data-testid="filter-publisher-option">
+                                <input type="checkbox"
+                                       checked="@selectedPublisherIds.Contains(publisher.Id)"
+                                       @onchange="e => TogglePublisher(publisher.Id, (bool)(e.Value ?? false))"
+                                       class="accent-blue-500 w-4 h-4"
+                                       aria-label="@publisher.Name" />
+                                <span class="text-slate-300 text-sm group-hover:text-slate-100 transition-colors">
+                                    @publisher.Name
+                                </span>
+                            </label>
+                        }
+                    </div>
+                </fieldset>
+            }
+
+        </div>
+
+        @if (selectedCategoryIds.Count > 0 || selectedPublisherIds.Count > 0)
+        {
+            <button data-testid="filter-clear-button"
+                    @onclick="ClearFilters"
+                    class="mt-4 text-sm text-blue-400 hover:text-blue-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1">
+                Clear all filters
+            </button>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Raised whenever the active filter selection changes.</summary>
+    [Parameter]
+    public EventCallback<(int[] CategoryIds, int[] PublisherIds)> OnFiltersChanged { get; set; }
+
+    private List<Category> categories = [];
+    private List<Publisher> publishers = [];
+    private HashSet<int> selectedCategoryIds = [];
+    private HashSet<int> selectedPublisherIds = [];
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var client = HttpClientFactory.CreateClient("API");
+
+        var categoriesTask = client.GetFromJsonAsync<List<Category>>("api/categories");
+        var publishersTask = client.GetFromJsonAsync<List<Publisher>>("api/publishers");
+
+        await Task.WhenAll(categoriesTask, publishersTask);
+
+        categories = categoriesTask.Result ?? [];
+        publishers = publishersTask.Result ?? [];
+        isLoading = false;
+    }
+
+    private async Task ToggleCategory(int id, bool isChecked)
+    {
+        if (isChecked) selectedCategoryIds.Add(id);
+        else selectedCategoryIds.Remove(id);
+        await NotifyChanged();
+    }
+
+    private async Task TogglePublisher(int id, bool isChecked)
+    {
+        if (isChecked) selectedPublisherIds.Add(id);
+        else selectedPublisherIds.Remove(id);
+        await NotifyChanged();
+    }
+
+    private async Task ClearFilters()
+    {
+        selectedCategoryIds.Clear();
+        selectedPublisherIds.Clear();
+        await NotifyChanged();
+    }
+
+    private async Task NotifyChanged()
+    {
+        await OnFiltersChanged.InvokeAsync(
+            ([.. selectedCategoryIds], [.. selectedPublisherIds]));
+    }
+}
