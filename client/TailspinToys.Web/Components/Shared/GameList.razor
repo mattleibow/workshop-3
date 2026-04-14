@@ -1,8 +1,11 @@
 @rendermode InteractiveServer
+@using TailspinToys.Web.Models
 @inject IHttpClientFactory HttpClientFactory
 
 <div>
     <h2 class="text-2xl font-medium mb-6 text-slate-100">Featured Games</h2>
+
+    <GameFilter FilterChanged="OnFilterChanged" />
 
     @if (isLoading)
     {
@@ -31,13 +34,28 @@
     private Game[]? games;
     private bool isLoading = true;
     private string? errorMessage;
+    private GameFilterState currentFilter = new();
 
     protected override async Task OnInitializedAsync()
+    {
+        await FetchGames();
+    }
+
+    private async Task OnFilterChanged(GameFilterState filter)
+    {
+        currentFilter = filter;
+        isLoading = true;
+        errorMessage = null;
+        await FetchGames();
+    }
+
+    private async Task FetchGames()
     {
         try
         {
             var client = HttpClientFactory.CreateClient("API");
-            var response = await client.GetAsync("api/games");
+            var url = BuildUrl();
+            var response = await client.GetAsync(url);
 
             if (response.IsSuccessStatusCode)
             {
@@ -56,5 +74,19 @@
         {
             isLoading = false;
         }
+    }
+
+    private string BuildUrl()
+    {
+        var url = "api/games";
+        var queryParams = new List<string>();
+
+        if (currentFilter.CategoryId.HasValue)
+            queryParams.Add($"categoryId={currentFilter.CategoryId.Value}");
+
+        if (currentFilter.PublisherId.HasValue)
+            queryParams.Add($"publisherId={currentFilter.PublisherId.Value}");
+
+        return queryParams.Count > 0 ? $"{url}?{string.Join("&", queryParams)}" : url;
     }
 }
