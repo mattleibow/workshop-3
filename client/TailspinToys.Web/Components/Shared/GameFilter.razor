@@ -1,6 +1,7 @@
 @* GameFilter.razor - Renders category and publisher filter badge pills.
-   Emits FilterChanged when the user toggles a filter or clears all filters. *@
-@rendermode InteractiveServer
+   Emits FilterChanged when the user toggles a filter or clears all filters.
+   Note: no @rendermode directive here — this component is always rendered as a
+   child of the already-interactive GameList component. *@
 @using TailspinToys.Web.Models
 @inject IHttpClientFactory HttpClientFactory
 

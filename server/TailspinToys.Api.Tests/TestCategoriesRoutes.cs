@@ -27,6 +27,9 @@ public class TestCategoriesRoutes : IDisposable
         new() { ["name"] = "Cooperative", ["description"] = "Games where players work together" }
     ];
 
+    // Category that has no games — should not appear in the API response.
+    private const string UnusedCategoryName = "Unused Category";
+
     private const string CategoriesApiPath = "/api/categories";
 
     public TestCategoriesRoutes()
@@ -56,12 +59,36 @@ public class TestCategoriesRoutes : IDisposable
 
     private static void SeedTestData(TailspinToysContext db)
     {
-        var categories = TestCategories.Select(c => new Category
+        // Seed a publisher required by the Game FK.
+        var publisher = new Publisher { Name = "Test Publisher", Description = "A test publisher" };
+        db.Publishers.Add(publisher);
+
+        // Seed categories — each used category gets at least one game.
+        var usedCategories = TestCategories.Select(c => new Category
         {
-            Name = (string)c["name"],
+            Name        = (string)c["name"],
             Description = (string)c["description"]
-        });
-        db.Categories.AddRange(categories);
+        }).ToList();
+        db.Categories.AddRange(usedCategories);
+
+        // Seed a category that has no games attached — must not appear in the response.
+        var unusedCategory = new Category { Name = UnusedCategoryName, Description = "No games here" };
+        db.Categories.Add(unusedCategory);
+
+        db.SaveChanges();
+
+        // Attach one game to each used category so the endpoint returns them.
+        foreach (var category in usedCategories)
+        {
+            db.Games.Add(new Game
+            {
+                Title       = $"Game for {category.Name}",
+                Description = "A test game for filter endpoint coverage.",
+                CategoryId  = category.Id,
+                PublisherId = publisher.Id
+            });
+        }
+
         db.SaveChanges();
     }
 
@@ -149,6 +176,7 @@ public class TestCategoriesRoutes : IDisposable
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TailspinToysContext>();
+        db.Games.RemoveRange(db.Games);
         db.Categories.RemoveRange(db.Categories);
         db.SaveChanges();
 
@@ -158,6 +186,32 @@ public class TestCategoriesRoutes : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(data);
         Assert.Empty(data);
+    }
+
+    /// <summary>
+    /// GET /api/categories omits categories that have no associated games.
+    /// </summary>
+    [Fact]
+    public async Task GetCategories_OnlyReturnsUsedCategories()
+    {
+        var response = await _client.GetAsync(CategoriesApiPath);
+        var data = await response.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(data);
+
+        var returnedNames = data
+            .Select(c => Assert.IsType<JsonElement>(c["name"]).GetString())
+            .ToHashSet();
+
+        // The unused category must not be present.
+        Assert.DoesNotContain(UnusedCategoryName, returnedNames);
+
+        // All used categories must be present.
+        foreach (var expected in TestCategories)
+        {
+            Assert.Contains(expected["name"].ToString(), returnedNames);
+        }
     }
 
     public void Dispose()

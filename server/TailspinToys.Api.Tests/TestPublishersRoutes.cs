@@ -27,6 +27,9 @@ public class TestPublishersRoutes : IDisposable
         new() { ["name"] = "Binary Bros",   ["description"] = "Puzzle and logic game studio" }
     ];
 
+    // Publisher that has no games — should not appear in the API response.
+    private const string UnusedPublisherName = "Unused Publisher";
+
     private const string PublishersApiPath = "/api/publishers";
 
     public TestPublishersRoutes()
@@ -57,12 +60,36 @@ public class TestPublishersRoutes : IDisposable
 
     private static void SeedTestData(TailspinToysContext db)
     {
-        var publishers = TestPublishers.Select(p => new Publisher
+        // Seed a category required by the Game FK.
+        var category = new Category { Name = "Test Category", Description = "A test category" };
+        db.Categories.Add(category);
+
+        // Seed publishers — each used publisher gets at least one game.
+        var usedPublishers = TestPublishers.Select(p => new Publisher
         {
-            Name = (string)p["name"],
+            Name        = (string)p["name"],
             Description = (string)p["description"]
-        });
-        db.Publishers.AddRange(publishers);
+        }).ToList();
+        db.Publishers.AddRange(usedPublishers);
+
+        // Seed a publisher that has no games attached — must not appear in the response.
+        var unusedPublisher = new Publisher { Name = UnusedPublisherName, Description = "No games here" };
+        db.Publishers.Add(unusedPublisher);
+
+        db.SaveChanges();
+
+        // Attach one game to each used publisher so the endpoint returns them.
+        foreach (var publisher in usedPublishers)
+        {
+            db.Games.Add(new Game
+            {
+                Title       = $"Game for {publisher.Name}",
+                Description = "A test game for filter endpoint coverage.",
+                CategoryId  = category.Id,
+                PublisherId = publisher.Id
+            });
+        }
+
         db.SaveChanges();
     }
 
@@ -150,6 +177,7 @@ public class TestPublishersRoutes : IDisposable
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TailspinToysContext>();
+        db.Games.RemoveRange(db.Games);
         db.Publishers.RemoveRange(db.Publishers);
         db.SaveChanges();
 
@@ -159,6 +187,32 @@ public class TestPublishersRoutes : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(data);
         Assert.Empty(data);
+    }
+
+    /// <summary>
+    /// GET /api/publishers omits publishers that have no associated games.
+    /// </summary>
+    [Fact]
+    public async Task GetPublishers_OnlyReturnsUsedPublishers()
+    {
+        var response = await _client.GetAsync(PublishersApiPath);
+        var data = await response.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(data);
+
+        var returnedNames = data
+            .Select(p => Assert.IsType<JsonElement>(p["name"]).GetString())
+            .ToHashSet();
+
+        // The unused publisher must not be present.
+        Assert.DoesNotContain(UnusedPublisherName, returnedNames);
+
+        // All used publishers must be present.
+        foreach (var expected in TestPublishers)
+        {
+            Assert.Contains(expected["name"].ToString(), returnedNames);
+        }
     }
 
     public void Dispose()
