@@ -19,7 +19,7 @@ safe-outputs:
     title-prefix: "Daily Digest –"
     labels: [digest]
     close-older-issues: true
-    expires: 7d
+    expires: 7
 timeout-minutes: 10
 ---
 
