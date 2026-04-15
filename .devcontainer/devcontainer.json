@@ -12,8 +12,7 @@
 		},
 		"ghcr.io/devcontainers/features/node:1": {},
 		"ghcr.io/warrenbuckley/codespace-features/sqlite:1": {},
-		"ghcr.io/schlich/devcontainer-features/playwright:0": {},
-		"ghcr.io/devcontainers/features/github-cli:1": {}
+		"ghcr.io/schlich/devcontainer-features/playwright:0": {}
 	},
 	"postCreateCommand": "./scripts/setup-env.sh",
 	"forwardPorts": [
@@ -26,7 +25,8 @@
 				"github.copilot",
 				"github.copilot-chat",
 				"ms-dotnettools.csharp",
-				"ms-dotnettools.csdevkit"
+				"ms-dotnettools.csdevkit",
+				"ms-dotnettools.dotnet-interactive-vscode"
 			]
 		}
 	}
